@@ -12,8 +12,10 @@
 - پیام‌های سفارش/پشتیبانی واقعاً به تلگرام مالک ارسال شوند.
 
 ### اندپوینت‌ها
-- `POST /api/ai` — ارتباط سه هوش مصنوعی: **Gemini (AI Studio + Vertex AI) → Cloudflare Workers AI → Ollama**
-- `POST /api/drug` — دریافت اطلاعات دارو از **OpenFDA + NLM RxNorm**
+- `POST /api/ai` — زنجیره fail-over هفت موتور هوش مصنوعی (اگر هرکدام جواب نداد، خودکار می‌رود سراغ بعدی):
+  **Gemini → Mistral AI → AI/ML API → BazaarLink → AI Native Studio → Cloudflare Workers AI → Ollama**
+- `GET  /api/ai` — تست سلامت: مشخص می‌کند کدام موتورها همین الان کار می‌کنند
+- `POST /api/drug` — اطلاعات دارو از **apieco (مرجع فارسی) → OpenFDA/DailyMed → NLM RxNorm**
 - `POST /api/notify` — ارسال واقعی پیام به تلگرام مالک (Bot API)
 - `GET  /api/feed` — فید روزانه ویدیو/نکته/تبلیغ (هر ۲۴ ساعت تازه‌سازی و حذف موارد قدیمی)
 - `GET  /api/telegram-init` — کشف آیدی عددی تلگرام شما (برای ارسال مستقیم)
@@ -25,7 +27,12 @@
 
 | نام متغیر | مقدار | کاربرد |
 |-----------|-------|--------|
-| `GEMINI_API_KEY` | کلید Gemini (AI Studio یا Vertex AI) | هوش مصنوعی |
+| `GEMINI_API_KEY` | کلید Gemini | هوش مصنوعی (۱) |
+| `MISTRAL_API_KEY` | کلید mistral.ai | هوش مصنوعی (۲) |
+| `AIMLAPI_KEY` | کلید aimlapi.com | هوش مصنوعی (۳) |
+| `BAZAARLINK_API_KEY` | کلید bazaarlink.ai | هوش مصنوعی (۴) |
+| `AINATIVE_API_KEY` | کلید ainative.studio | هوش مصنوعی (۵) |
+| `APIECO_TOKEN` | توکن apieco.ir | مرجع دارویی فارسی |
 | `GEMINI_PROJECT_ID` | شماره پروژه (مثل ۱۳۵۷۵۷۲۲۵۰۲۹) | Vertex AI |
 | `GEMINI_LOCATION` | مثلاً `us-central1` | Vertex AI |
 | `CLOUDFLARE_ACCOUNT_ID` | شناسه اکانت Cloudflare | Cloudflare Workers AI |
@@ -53,3 +60,22 @@
 npm install
 npm run build   # خروجی در dist/
 ```
+
+## رفتار جستجو (بدون اطلاعات ساختگی)
+
+- هیچ دارو یا بیماری «پیش‌فرض» دیگر نمایش داده نمی‌شود؛ صفحه با فرم خالی باز می‌شود.
+- هر جستجو به ترتیب از این مسیرها می‌گذرد: پایگاه دانش داخلی → apieco/OpenFDA/RxNorm → زنجیره هفت موتور هوش مصنوعی.
+- اگر هیچ منبعی پاسخ واقعی نداشت، فقط پیام **«چیزی پیدا نشد»** نشان داده می‌شود؛ هیچ متن یا مونوگراف ساختگی تولید نمی‌شود.
+- بخش‌های خالی (مثلاً وقتی منبع مکانیسم اثر ندارد) اصلاً رندر نمی‌شوند.
+
+### بررسی سلامت موتورهای هوش مصنوعی
+آدرس `https://<domain>/api/ai` را در مرورگر باز کنید (متد GET). خروجی، لیست موتورها به همراه
+`ok` و زمان پاسخ هرکدام است تا مطمئن شوید همه کلیدها فعال‌اند.
+
+## نکته امنیتی مهم درباره کلیدها
+
+کلیدهای API دیگر داخل کد نیستند (GitHub جلوی پوش شدن کلید واقعی را می‌گیرد).
+همه کلیدها باید در **Vercel → Settings → Environment Variables** ثبت شوند.
+فهرست نام متغیرها در فایل `.env.example` آمده و مقادیر واقعی در فایل محلی
+`.env.local.keys.txt` (خارج از گیت) نگهداری می‌شود.
+اگر یک متغیر ست نشود، آن موتور به‌سادگی رد می‌شود و نوبت به موتور بعدی می‌رسد.
