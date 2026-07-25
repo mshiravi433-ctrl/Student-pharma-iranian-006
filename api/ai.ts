@@ -1,9 +1,10 @@
 // =============================================================================
 //  /api/ai  —  Multi-Model AI Proxy (Vercel Serverless Function)
-//  Tries:  Google Gemini (AI Studio + Vertex AI)  ->  Cloudflare Workers AI  ->  Ollama
-//  All calls happen SERVER-SIDE so there is no browser CORS and API keys stay secret.
-//  Secrets fall back to the values supplied by the project owner, but it is
-//  recommended to set them as Vercel Environment Variables (see README).
+//  Tries:  Cloudflare Workers AI  ->  Google Gemini (AI Studio + Vertex AI)
+//          ->  Ollama (hosted or self-hosted)
+//  All calls happen SERVER-SIDE so there is no browser CORS and API keys stay
+//  secret. Secrets fall back to the values supplied by the project owner, but
+//  it is recommended to set them as Vercel Environment Variables (see README).
 // =============================================================================
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6I2DPvZkStsgvlm0GQlsEEnmL-h-oIEnNl5sj67aG-t2Q';
@@ -17,17 +18,14 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
 
 function readJson(req: any): Promise<any> {
   return new Promise((resolve) => {
-    // Already-parsed plain object (some runtimes).
     if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body) && !Array.isArray(req.body)) {
       resolve(req.body);
       return;
     }
-    // Already a JSON string.
     if (typeof req.body === 'string' && req.body.length) {
       try { resolve(JSON.parse(req.body)); } catch { resolve({}); }
       return;
     }
-    // Otherwise read the raw stream (Vercel Node functions hand an IncomingMessage).
     let body = '';
     req.on('data', (chunk: any) => { body += chunk; });
     req.on('end', () => { try { resolve(body ? JSON.parse(body) : {}); } catch { resolve({}); } });
@@ -53,7 +51,27 @@ export default async function handler(req: any, res: any) {
   const fullPrompt = `${systemInstruction}\n\nUser query: ${prompt}\nProvide a concise, highly structured medical response in bilingual Persian and English.`;
 
   // ---------------------------------------------------------------------------
-  // 1) Google Gemini — AI Studio endpoint (Google AI Studio keys)
+  // 1) Cloudflare Workers AI (Llama 3 / 3.1 Instruct) — most reliable here.
+  // ---------------------------------------------------------------------------
+  try {
+    for (const model of ['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3-8b-instruct']) {
+      const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/${model}`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}` },
+        body: JSON.stringify({ messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) {
+        const d: any = await r.json();
+        const t = d?.result?.response;
+        if (t) { json(res, 200, { text: t, provider: `Cloudflare Workers AI (${model})` }); return; }
+      }
+    }
+  } catch { /* try next provider */ }
+
+  // ---------------------------------------------------------------------------
+  // 2) Google Gemini — AI Studio endpoint (Google AI Studio keys)
   // ---------------------------------------------------------------------------
   try {
     for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
@@ -73,7 +91,7 @@ export default async function handler(req: any, res: any) {
   } catch { /* try next provider */ }
 
   // ---------------------------------------------------------------------------
-  // 1b) Google Gemini — Vertex AI endpoint (project-bound keys)
+  // 2b) Google Gemini — Vertex AI endpoint (project-bound keys)
   // ---------------------------------------------------------------------------
   try {
     for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash']) {
@@ -93,53 +111,32 @@ export default async function handler(req: any, res: any) {
   } catch { /* try next provider */ }
 
   // ---------------------------------------------------------------------------
-  // 2) Cloudflare Workers AI (Llama 3 / 3.1 Instruct)
-  // ---------------------------------------------------------------------------
-  try {
-    for (const model of ['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3-8b-instruct']) {
-      const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/${model}`;
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}` },
-        body: JSON.stringify({ messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }] }),
-        signal: AbortSignal.timeout(6000),
-      });
-      if (r.ok) {
-        const d: any = await r.json();
-        const t = d?.result?.response;
-        if (t) { json(res, 200, { text: t, provider: `Cloudflare Workers AI (${model})` }); return; }
-      }
-    }
-  } catch { /* try next provider */ }
-
-  // ---------------------------------------------------------------------------
-  // 3) Ollama (hosted or self-hosted). Bearer key is optional.
+  // 3) Ollama (hosted or self-hosted). Tries the native /api/chat and the
+  //    OpenAI-compatible /v1/chat/completions endpoint. Bearer key optional.
   // ---------------------------------------------------------------------------
   try {
     const base = OLLAMA_BASE_URL.replace(/\/+$/, '');
-    const url = `${base}/api/chat`;
     const headers: any = { 'Content-Type': 'application/json' };
     if (OLLAMA_LLM_KEY) headers['Authorization'] = `Bearer ${OLLAMA_LLM_KEY}`;
-    const r = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }],
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (r.ok) {
-      const d: any = await r.json();
-      const t = d?.message?.content || d?.response;
-      if (t) { json(res, 200, { text: t, provider: `Ollama AI (${OLLAMA_MODEL})` }); return; }
+
+    const endpoints = [
+      { url: `${base}/api/chat`, body: { model: OLLAMA_MODEL, messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }], stream: false } },
+      { url: `${base}/v1/chat/completions`, body: { model: OLLAMA_MODEL, messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: prompt }], stream: false } },
+    ];
+
+    for (const ep of endpoints) {
+      const r = await fetch(ep.url, { method: 'POST', headers, body: JSON.stringify(ep.body), signal: AbortSignal.timeout(7000) });
+      if (r.ok) {
+        const d: any = await r.json();
+        const t = d?.message?.content || d?.choices?.[0]?.message?.content || d?.response;
+        if (t) { json(res, 200, { text: t, provider: `Ollama AI (${OLLAMA_MODEL})` }); return; }
+      }
     }
   } catch { /* fall through to fallback */ }
 
   // ---------------------------------------------------------------------------
   // Fallback — all providers unreachable. Return empty text so the client can
-  // show its built-in medical synthesizer instead of breaking.
+  // show its built-in medical synthesizer / knowledge base instead of breaking.
   // ---------------------------------------------------------------------------
   json(res, 200, { text: '', provider: 'Intelligent AI Medical Engine (Fallback)' });
 }

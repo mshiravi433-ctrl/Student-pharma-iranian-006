@@ -11,8 +11,10 @@
 // =============================================================================
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8783007968:AAEX6jKE96SXKVhs7maFSYKKOUVD8KXyCQs';
-const ADMIN_CHAT_ID = (process.env.TELEGRAM_ADMIN_CHAT_ID || 'shiravi433').toString().trim();
-const DEVELOPER_USERNAME = 'shiravi433';
+const ADMIN_CHAT_ID = (process.env.TELEGRAM_ADMIN_CHAT_ID || '').toString().trim();
+const DEVELOPER_USERNAME = 'Shiravi4333';
+// Backup username (old handle) in case the bot is also an admin there.
+const LEGACY_USERNAME = 'shiravi433';
 
 function readJson(req: any): Promise<any> {
   return new Promise((resolve) => {
@@ -71,10 +73,11 @@ export default async function handler(req: any, res: any) {
     `🤖 ارسال شده از مینی‌اپ هوشمند همیار دانشجو\n` +
     `👤 تهیه‌کنندگان: تکتم عباسپور و محمد شیروی`;
 
-  // Build the ordered target list: numeric id first, then the @username.
+  // Build the ordered target list: numeric id first, then the @username(s).
   const targets: string[] = [];
   if (/^\d+$/.test(ADMIN_CHAT_ID)) targets.push(ADMIN_CHAT_ID);
   if (!targets.includes(DEVELOPER_USERNAME)) targets.push(DEVELOPER_USERNAME);
+  if (LEGACY_USERNAME && !targets.includes(LEGACY_USERNAME)) targets.push(LEGACY_USERNAME);
 
   let lastError = '';
   for (const chatId of targets) {

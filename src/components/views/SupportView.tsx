@@ -58,9 +58,9 @@ export const SupportView: React.FC = () => {
     setMessages(prev => [...prev, newMsg]);
 
     // Try live AI response from Gemini / Cloudflare / Ollama
-    const aiRes = await queryMultiModelAi(userText, `You are the friendly Persian AI assistant of Hamyar Daneshjoo mini app created by Mohammad Shiravi (@shiravi433). Keep your answers concise, practical, and in fluent Persian.`);
+    const aiRes = await queryMultiModelAi(userText, `You are the friendly Persian AI assistant of Hamyar Daneshjoo mini app created by Mohammad Shiravi (@Shiravi4333). Keep your answers concise, practical, and in fluent Persian.`);
     
-    let reply = aiRes.text ? `[پاسخ زنده از ${aiRes.provider.split(' ')[0]}]:\n\n${aiRes.text}` : 'دریافت شد! سوال شما برای بررسی دقیق در سیستم ثبت گردید. برای پاسخ فوری انسانی می‌توانید روی دکمه «ارسال به تلگرام @shiravi433» کلیک کنید.';
+    let reply = aiRes.text ? `[پاسخ زنده از ${aiRes.provider.split(' ')[0]}]:\n\n${aiRes.text}` : 'دریافت شد! سوال شما برای بررسی دقیق در سیستم ثبت گردید. برای پاسخ فوری انسانی می‌توانید روی دکمه «ارسال به تلگرام @Shiravi4333» کلیک کنید.';
     
     if (!aiRes.text) {
       if (/دارو|سرماخوردگی|میگرن|دوز|عوارض|تداخل/i.test(userText)) {
@@ -70,7 +70,7 @@ export const SupportView: React.FC = () => {
       } else if (/مقاله|isi|scopus|pubmed|پاب‌مد|اسکوپوس|پژوهش|پایان‌نامه/i.test(userText)) {
         reply = 'در منوی «نوشتن و چاپ مقاله»، می‌توانید درخواست مشاوره، نگارش و چاپ مقالات خود در پایگاه‌های Scopus، PubMed و Web of Science *ISI را با انتخاب چندگزینه‌ای ثبت کرده و به تلگرام پشتیبانی ارسال نمایید.';
       } else if (/خارج|انگلیس|هلند|چین|هند|روسیه|کانادا|آلمان|ایتالیا|سوئد|پذیرش|بورسیه/i.test(userText)) {
-        reply = 'در بخش «ثبت‌نام تحصیل در خارج»، می‌توانید فرم انتخاب دو رشته (پزشکی، دندانپزشکی و...) و کشور مورد علاقه خود را پر کنید تا پرونده شما جهت مشاوره مستقیم به اکانت @shiravi433 ارسال شود.';
+        reply = 'در بخش «ثبت‌نام تحصیل در خارج»، می‌توانید فرم انتخاب دو رشته (پزشکی، دندانپزشکی و...) و کشور مورد علاقه خود را پر کنید تا پرونده شما جهت مشاوره مستقیم به اکانت @Shiravi4333 ارسال شود.';
       } else if (/خرید|چین|قیمت|تخفیف|ارسال|لیتمن|توربین|تبلت|اسکراب/i.test(userText)) {
         reply = 'کالاهای ما مستقیماً از نمایندگی‌های چین وارد می‌شوند و ۴۰ تا ۷۰ درصد زیر قیمت بازار ایران هستند. مدت ارسال کالا بین ۱۰ تا ۲۰ روز کاری است.';
       } else if (/کار|استخدام|جاب ویژن|پروژه|حقوق/i.test(userText)) {
@@ -124,7 +124,7 @@ export const SupportView: React.FC = () => {
     },
     {
       q: 'چگونه می‌توانم برای تحصیل در کشورهای اروپایی یا آسیایی ثبت‌نام کنم؟',
-      a: `در بخش «ثبت‌نام تحصیل در خارج»، فرم مربوطه را تکمیل کرده و از بین کشورهای انگلیس، هلند، چین، هند، روسیه، کانادا، آلمان، سوئد و ایتالیا انتخاب کنید. با سیستم دو گزینه‌ای، رشته اصلی و جایگزین را مشخص نمایید تا اطلاعات به اکانت تلگرام @shiravi433 ارسال شود.`
+      a: `در بخش «ثبت‌نام تحصیل در خارج»، فرم مربوطه را تکمیل کرده و از بین کشورهای انگلیس، هلند، چین، هند، روسیه، کانادا، آلمان، سوئد و ایتالیا انتخاب کنید. با سیستم دو گزینه‌ای، رشته اصلی و جایگزین را مشخص نمایید تا اطلاعات به اکانت تلگرام @Shiravi4333 ارسال شود.`
     },
     {
       q: 'آیا جستجوی دارویی هوش مصنوعی (AI) شامل داروهای گیاهی هم می‌شود؟',

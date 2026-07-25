@@ -350,7 +350,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ onSelectMenu }) => {
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              ارسال مستقیم سوالات، پیشنهادات و پیگیری سفارشات به اکانت تلگرام پشتیبانی: <span className="font-mono text-purple-300 font-bold">@shiravi433</span>
+              ارسال مستقیم سوالات، پیشنهادات و پیگیری سفارشات به اکانت تلگرام پشتیبانی: <span className="font-mono text-purple-300 font-bold">@Shiravi4333</span>
             </p>
           </div>
         </div>

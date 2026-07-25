@@ -1,5 +1,6 @@
 import { DrugMonograph, TreatmentProtocol } from '../types';
 import { queryDrugApi, queryAiApi } from '../utils/telegram';
+import { DISEASE_KB, DRUG_KB, normalizeQuery } from './clinicalKB';
 
 export interface DrugRefSite {
   name: string;
@@ -678,6 +679,22 @@ export const synthesizeAiMedicalData = async (query: string): Promise<{ drug?: D
   // 2) AI SYNTHESIS via serverless /api/ai (Gemini -> Cloudflare -> Ollama)
   const aiRes = await queryAiApi(`Provide comprehensive clinical drug / treatment protocol details for: "${cleanQuery}". Include key mechanism, standard dosing, and side effects.`);
 
+  // Use the built-in knowledge base when no live AI text is available.
+  const kbDisease = !aiRes.text ? DISEASE_KB[normalizeQuery(cleanQuery) || ''] : null;
+  if (kbDisease) {
+    const aiProtocol: TreatmentProtocol = {
+      id: `kb-proto-${Date.now()}`,
+      diseaseNameFa: kbDisease.nameFa,
+      diseaseNameEn: kbDisease.nameEn,
+      overview: { fa: kbDisease.overviewFa, en: kbDisease.overviewEn },
+      firstLineTherapy: kbDisease.firstLine,
+      adjunctiveHerbalTherapy: kbDisease.herbal,
+      lifestyleAdviceFa: kbDisease.lifestyleFa,
+      lifestyleAdviceEn: kbDisease.lifestyleEn,
+    };
+    return { protocol: aiProtocol };
+  }
+
   if (isDiseaseQuery && !cleanQuery.includes('قرص') && !cleanQuery.includes('شربت') && !cleanQuery.includes('کپسول')) {
     // Generate AI Treatment Protocol
     const aiProtocol: TreatmentProtocol = {
@@ -743,6 +760,30 @@ export const synthesizeAiMedicalData = async (query: string): Promise<{ drug?: D
     };
     return { protocol: aiProtocol };
   } else {
+    // Use the built-in knowledge base when no live AI text is available.
+    const kbDrug = !aiRes.text ? DRUG_KB[normalizeQuery(cleanQuery) || ''] : null;
+    if (kbDrug) {
+      const aiDrug: DrugMonograph = {
+        id: `kb-drug-${Date.now()}`,
+        nameFa: kbDrug.nameFa,
+        nameEn: kbDrug.nameEn,
+        genericNameFa: kbDrug.genericNameFa,
+        genericNameEn: kbDrug.genericNameEn,
+        category: kbDrug.category,
+        type: kbDrug.type,
+        indications: { fa: kbDrug.indicationsFa, en: kbDrug.indicationsEn },
+        mechanism: { fa: kbDrug.mechanismFa, en: kbDrug.mechanismEn },
+        dosageAndAdministration: { adults: { fa: kbDrug.dosageAdultsFa, en: kbDrug.dosageAdultsEn } },
+        forms: kbDrug.forms,
+        sideEffects: { fa: kbDrug.sideEffectsFa, en: kbDrug.sideEffectsEn },
+        interactions: { fa: kbDrug.interactionsFa, en: kbDrug.interactionsEn },
+        precautions: { fa: kbDrug.precautionsFa, en: kbDrug.precautionsEn },
+        pregnancyCategory: kbDrug.pregnancyCategory,
+        source: kbDrug.source,
+      };
+      return { drug: aiDrug };
+    }
+
     // Generate AI Drug Monograph
     const aiDrug: DrugMonograph = buildGenericDrug(
       cleanQuery,
