@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --input-type=module -e \"import{installFetch}from'./tests/apiTest.mjs';installFetch();await import('./tests/run.mjs');\"",
-    "test:live": "node tests/live.mjs"
+    "test:live": "node tests/live.mjs",
+    "test:online": "node tests/integration.mjs",
+    "verify": "npx tsc --noEmit && npm run build && npm test && npm run test:online"
   },
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",
