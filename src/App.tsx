@@ -13,6 +13,7 @@ import { JobsView } from './components/views/JobsView';
 import { StudyAbroadView } from './components/views/StudyAbroadView';
 import { ShopView } from './components/views/ShopView';
 import { SupportView } from './components/views/SupportView';
+import { DailyFeedView } from './components/views/DailyFeedView';
 import { ArrowRight } from 'lucide-react';
 
 export function App() {
@@ -63,6 +64,7 @@ export function App() {
         {currentView === 'study-abroad' && <StudyAbroadView />}
         {currentView === 'shop' && <ShopView />}
         {currentView === 'support' && <SupportView />}
+        {currentView === 'daily-feed' && <DailyFeedView onNavigate={handleNavigate} />}
       </main>
 
       {/* 4. Footer with Developer Credits (محمد شیروی) & Shortcuts */}

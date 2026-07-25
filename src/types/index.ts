@@ -7,7 +7,8 @@ export type ActiveView =
   | 'jobs'
   | 'study-abroad'
   | 'shop'
-  | 'support';
+  | 'support'
+  | 'daily-feed';
 
 export interface TelegramUser {
   id: number;
@@ -129,4 +130,16 @@ export interface CustomOrderForm {
   countryOfOrigin?: string;
   additionalNotes?: string;
   contactPhone: string;
+}
+
+export interface FeedItem {
+  id: string;
+  kind: 'video' | 'tip' | 'ad';
+  title: string;
+  text: string;
+  url?: string;
+  thumbnail?: string;
+  actionLabel?: string;
+  actionView?: ActiveView;
+  publishedAt: number;
 }

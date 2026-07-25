@@ -1,5 +1,5 @@
 import { DrugMonograph, TreatmentProtocol } from '../types';
-import { OPEN_FDA_API_KEY, GEMINI_API_KEY, OLLAMA_LLM_KEY, queryMultiModelAi } from '../utils/telegram';
+import { queryDrugApi, queryAiApi } from '../utils/telegram';
 
 export interface DrugRefSite {
   name: string;
@@ -621,180 +621,62 @@ export const synthesizeAiMedicalData = async (query: string): Promise<{ drug?: D
   const cleanQuery = query.trim();
   const isDiseaseQuery = /سرماخوردگی|آنفولانزا|میگرن|سردرد|ورم معده|گاستریت|کرونا|سرفه|تب|عفونت|آلرژی|حساسیت|فشار خون|دیابت|اضطراب|بی‌خوابی|سینوزیت|زخم|آسم|cold|flu|migraine|headache|gastritis|ulcer|covid|cough|fever|infection|allergy|hypertension|diabetes|anxiety|insomnia/i.test(cleanQuery);
 
-  // Log active LLM & API engines (Gemini & Ollama & OpenFDA) for debugging & live routing
-  if (typeof window !== 'undefined' && window.console) {
-    console.debug('AI Medical Engines Active:', { gemini: GEMINI_API_KEY.slice(0, 5) + '...', ollama: OLLAMA_LLM_KEY.slice(0, 5) + '...' });
-  }
+  // 1) LIVE DRUG LOOKUP via serverless /api/drug (OpenFDA + RxNorm)
+  if (!isDiseaseQuery && cleanQuery.length >= 2) {
+    const drugData = await queryDrugApi(cleanQuery);
+    if (drugData?.found && drugData.data) {
+      const d = drugData.data;
 
-  // Attempt live OpenFDA API fetch if it's a drug query
-  if (!isDiseaseQuery && cleanQuery.length >= 3) {
-    try {
-      const fdaUrl = `https://api.fda.gov/drug/label.json?api_key=${OPEN_FDA_API_KEY}&search=openfda.brand_name:"${encodeURIComponent(cleanQuery)}"+OR+openfda.generic_name:"${encodeURIComponent(cleanQuery)}"+OR+indications_and_usage:"${encodeURIComponent(cleanQuery)}"&limit=1`;
-      const response = await fetch(fdaUrl, { signal: AbortSignal.timeout(3500) });
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.results && data.results.length > 0) {
-          const res = data.results[0];
-          const openFda = res.openfda || {};
-          const brandName = openFda.brand_name ? openFda.brand_name[0] : cleanQuery;
-          const genericName = openFda.generic_name ? openFda.generic_name[0] : cleanQuery;
-          const purpose = res.purpose ? res.purpose[0] : (res.indications_and_usage ? res.indications_and_usage[0].slice(0, 300) : `داروی بالینی ثبت شده در سامانه رسمی سازمان غذا و دارو (FDA) برای درمان و کنترل عوارض بالینی مرتبط با ${cleanQuery}.`);
-          const dosage = res.dosage_and_administration ? res.dosage_and_administration[0].slice(0, 350) : 'مطابق با دستور پزشک معالج یا دوز استاندارد کاتالوگ دارویی مصرف شود.';
-          const warnings = res.warnings ? res.warnings[0].slice(0, 300) : 'در صورت سابقه حساسیت دارویی یا بارداری با پزشک مشورت شود.';
-          
-          const isSameName = brandName.toLowerCase() === genericName.toLowerCase();
-          const liveDrug: DrugMonograph = {
-            id: `fda-${Date.now()}`,
-            nameFa: brandName,
-            nameEn: isSameName ? brandName : `${brandName} (${genericName})`,
-            genericNameFa: genericName,
-            genericNameEn: genericName,
-            category: openFda.pharm_class_epc ? openFda.pharm_class_epc[0] : 'داروی بالینی مورد تایید سازمان غذا و دارو آمریکا (FDA Approved)',
-            type: 'chemical',
-            indications: {
-              fa: `بر اساس دیتابیس آنلاین FDA و مراجع بالینی: ${purpose.replace(/\[|\]/g, '')}`,
-              en: purpose
-            },
-            mechanism: {
-              fa: `عملکرد فارماکولوژیک بر اساس مراجع GuideToPharmacology و Medscape: تنظیم عملکرد گیرنده‌های بافتی و بهبود علائم بالینی.`,
-              en: `Pharmacological modulation based on live OpenFDA & GuideToPharmacology clinical database.`
-            },
-            dosageAndAdministration: {
-              adults: {
-                fa: `دستور مصرف بالینی FDA و DailyMed: ${dosage.replace(/\[|\]/g, '')}`,
-                en: dosage
-              },
-              pediatrics: {
-                fa: 'در کودکان بر اساس سن و وزن با مشورت متخصص اطفال و طبق پروتکل دوزبندی FDA تجویز گردد.',
-                en: 'Pediatric dosing titrated by weight and age under direct pediatrician supervision.'
-              }
-            },
-            forms: [
-              `فرم دارویی استاندارد ${brandName}`,
-              'قرص / کپسول / سوسپانسیون استاندارد دارویی',
-              'بسته‌بندی بالینی تحت نظارت سازمان غذا و دارو'
-            ],
-            sideEffects: {
-              fa: [
-                'عوارض عمومی ثبت شده در سامانه DailyMed و FDA:',
-                res.adverse_reactions ? res.adverse_reactions[0].slice(0, 150) + '...' : 'تحریک خفیف گوارشی، سردرد یا خستگی گذرا در برخی بیماران',
-                'در صورت بروز حساسیت پوستی شدید مصرف قطع شود'
-              ],
-              en: [
-                res.adverse_reactions ? res.adverse_reactions[0].slice(0, 150) + '...' : 'Mild transient headache or GI discomfort',
-                'Discontinue and seek medical care if hypersensitivity occurs'
-              ]
-            },
-            interactions: {
-              fa: [
-                'تداخلات دارویی ثبت شده در Medscape و سامانه تی‌تک (TTAC):',
-                res.drug_interactions ? res.drug_interactions[0].slice(0, 150) + '...' : 'از مصرف همزمان با الکل و داروهای تضعیف‌کننده سیستم عصبی مرکزی خودداری شود',
-                'فاصله ۲ ساعته با مکمل‌های آهن و آنتی‌اسید رعایت شود'
-              ],
-              en: [
-                res.drug_interactions ? res.drug_interactions[0].slice(0, 150) + '...' : 'Avoid concomitant CNS depressants or alcohol',
-                'Maintain 2-hour interval from antacids and iron supplements'
-              ]
-            },
-            precautions: {
-              fa: `هشدار رسمی سازمان غذا و دارو: ${warnings.replace(/\[|\]/g, '')}`,
-              en: warnings
-            },
-            pregnancyCategory: 'B / C (بررسی در سامانه FDA و مشاوره با پزشک معالج الزامی است)',
-            source: 'OpenFDA Live API، سازمان غذا و دارو آمریکا، دارویاب و Medscape'
-          };
-          return { drug: liveDrug };
-        }
+      // OpenFDA: full clinical monograph
+      if (d.brandName) {
+        const brandName = d.brandName || cleanQuery;
+        const genericName = d.genericName || brandName;
+        const isSameName = brandName.toLowerCase() === genericName.toLowerCase();
+        const liveDrug: DrugMonograph = {
+          id: `fda-${Date.now()}`,
+          nameFa: brandName,
+          nameEn: isSameName ? brandName : `${brandName} (${genericName})`,
+          genericNameFa: genericName,
+          genericNameEn: genericName,
+          category: d.pharmClass || 'داروی بالینی مورد تایید سازمان غذا و دارو آمریکا (FDA Approved)',
+          type: 'chemical',
+          indications: {
+            fa: `بر اساس دیتابیس آنلاین FDA و مراجع بالینی: ${d.purpose}`,
+            en: d.purpose
+          },
+          mechanism: {
+            fa: `عملکرد فارماکولوژیک بر اساس مراجع GuideToPharmacology و Medscape: تنظیم عملکرد گیرنده‌های بافتی و بهبود علائم بالینی.`,
+            en: `Pharmacological modulation based on live OpenFDA & GuideToPharmacology clinical database.`
+          },
+          dosageAndAdministration: {
+            adults: { fa: `دستور مصرف بالینی FDA و DailyMed: ${d.dosage}`, en: d.dosage },
+            pediatrics: { fa: 'در کودکان بر اساس سن و وزن با مشورت متخصص اطفال و طبق پروتکل دوزبندی FDA تجویز گردد.', en: 'Pediatric dosing titrated by weight and age under direct pediatrician supervision.' }
+          },
+          forms: [`فرم دارویی استاندارد ${brandName}`, 'قرص / کپسول / سوسپانسیون استاندارد دارویی', 'بسته‌بندی بالینی تحت نظارت سازمان غذا و دارو'],
+          sideEffects: {
+            fa: ['عوارض عمومی ثبت شده در سامانه DailyMed و FDA:', d.adverseReactions || 'تحریک خفیف گوارشی، سردرد یا خستگی گذرا در برخی بیماران', 'در صورت بروز حساسیت پوستی شدید مصرف قطع شود'],
+            en: [d.adverseReactions || 'Mild transient headache or GI discomfort', 'Discontinue and seek medical care if hypersensitivity occurs']
+          },
+          interactions: {
+            fa: ['تداخلات دارویی ثبت شده در Medscape و سامانه تی‌تک (TTAC):', d.drugInteractions || 'از مصرف همزمان با الکل و داروهای تضعیف‌کننده سیستم عصبی مرکزی خودداری شود', 'فاصله ۲ ساعته با مکمل‌های آهن و آنتی‌اسید رعایت شود'],
+            en: [d.drugInteractions || 'Avoid concomitant CNS depressants or alcohol', 'Maintain 2-hour interval from antacids and iron supplements']
+          },
+          precautions: { fa: `هشدار رسمی سازمان غذا و دارو: ${d.warnings}`, en: d.warnings },
+          pregnancyCategory: d.pregnancyCategory || 'B / C (بررسی در سامانه FDA و مشاوره با پزشک معالج الزامی است)',
+          source: drugData.source || 'OpenFDA Live API، سازمان غذا و دارو آمریکا، دارویاب و Medscape'
+        };
+        return { drug: liveDrug };
       }
-    } catch {
-      // Silently fallback if OpenFDA timeout or CORS
-    }
 
-    // Attempt second live API fetch via NLM RxNorm API (National Library of Medicine - 100% Free Public API)
-    try {
-      const rxUrl = `https://rxnav.nlm.nih.gov/REST/drugs.json?name=${encodeURIComponent(cleanQuery)}`;
-      const rxRes = await fetch(rxUrl, { signal: AbortSignal.timeout(3000) });
-      if (rxRes.ok) {
-        const rxData = await rxRes.json();
-        const conceptGroup = rxData?.drugGroup?.conceptGroup;
-        if (conceptGroup && conceptGroup.length > 0) {
-          let foundName = cleanQuery;
-          for (const grp of conceptGroup) {
-            if (grp.conceptProperties && grp.conceptProperties.length > 0) {
-              foundName = grp.conceptProperties[0].name || cleanQuery;
-              break;
-            }
-          }
-          const rxDrug: DrugMonograph = {
-            id: `rxnav-${Date.now()}`,
-            nameFa: foundName,
-            nameEn: foundName,
-            genericNameFa: foundName,
-            genericNameEn: foundName,
-            category: 'داروی ثبت شده در کتابخانه ملی پزشکی آمریکا (NLM RxNorm Approved)',
-            type: 'chemical',
-            indications: {
-              fa: `بر اساس مراجع بالینی Medscape و GuideToPharmacology: درمان، کنترل و مدیریت بالینی اندیکاسیون‌های مرتبط با ${foundName}.`,
-              en: `Clinical management and therapeutic indication documented in GuideToPharmacology and Medscape for ${foundName}.`
-            },
-            mechanism: {
-              fa: `تنظیم گیرنده‌های هدف و مسیرهای بیوشیمیایی سلولی بر اساس مستندات GuideToPharmacology و Drugs@FDA.`,
-              en: `Target receptor modulation and cellular pathway regulation documented in GuideToPharmacology.`
-            },
-            dosageAndAdministration: {
-              adults: {
-                fa: `دوز استاندارد بر اساس راهنمای بالینی DailyMed و Medscape: ۱ تا ۲ بار در روز همراه با یک لیوان آب، یا طبق تجویز پزشک معالج.`,
-                en: `Standard clinical dosage per DailyMed guidelines: 1 to 2 times daily with water as directed by healthcare provider.`
-              },
-              pediatrics: {
-                fa: 'در کودکان بر اساس سن و وزن و طبق پروتکل‌های دوزبندی اطفال تجویز گردد.',
-                en: 'Pediatric dosing titrated by weight and age under direct medical supervision.'
-              }
-            },
-            forms: [
-              `قرص / کپسول روکش‌دار ${foundName}`,
-              'سوسپانسیون و قطره خوراکی استاندارد',
-              'بسته‌بندی دارویی رسمی'
-            ],
-            sideEffects: {
-              fa: [
-                'عوارض جانبی عمومی ثبت شده در مراجع DailyMed و دارویاب:',
-                'تحریک خفیف گوارشی یا سردرد گذرا در برخی افراد حساس',
-                'در صورت بروز حساسیت پوستی شدید یا تنگی نفس مصرف قطع شود'
-              ],
-              en: [
-                'Mild transient gastrointestinal discomfort or headache',
-                'Discontinue therapy and consult physician if allergic skin reaction occurs'
-              ]
-            },
-            interactions: {
-              fa: [
-                'تداخلات ثبت شده در Medscape و سامانه تی‌تک (TTAC):',
-                'از مصرف همزمان با الکل یا داروهای تضعیف‌کننده سیستم عصبی خودداری شود',
-                'فاصله ۲ ساعته با آنتی‌اسیدها و مکمل‌های آهن رعایت شود'
-              ],
-              en: [
-                'Avoid concomitant use with CNS depressants or alcohol',
-                'Maintain a 2-hour separation interval from antacids and iron supplements'
-              ]
-            },
-            precautions: {
-              fa: 'دارو را در دمای اتاق، دور از رطوبت و نور مستقیم خورشید نگهداری کنید. دوره درمان را به طور کامل طی نمایید.',
-              en: 'Store at room temperature away from moisture and direct sunlight. Complete the full prescribed course of therapy.'
-            },
-            pregnancyCategory: 'B / C (بررسی در مراجع FDA و مشورت با پزشک معالج توصیه می‌شود)',
-            source: 'کتابخانه ملی پزشکی آمریکا (NLM RxNorm)، GuideToPharmacology، Medscape و DailyMed'
-          };
-          return { drug: rxDrug };
-        }
+      // RxNorm: only a resolved name -> generic-but-real monograph
+      if (d.name) {
+        return { drug: buildGenericDrug(d.name, drugData.source) };
       }
-    } catch {
-      // Silently fallback to AI / static synthesizer
     }
   }
 
-  // Actively invoke our 3 AI APIs (Gemini -> Cloudflare -> Ollama)
-  const aiRes = await queryMultiModelAi(`Provide comprehensive clinical drug / treatment protocol details for: "${cleanQuery}". Include key mechanism, standard dosing, and side effects.`);
+  // 2) AI SYNTHESIS via serverless /api/ai (Gemini -> Cloudflare -> Ollama)
+  const aiRes = await queryAiApi(`Provide comprehensive clinical drug / treatment protocol details for: "${cleanQuery}". Include key mechanism, standard dosing, and side effects.`);
 
   if (isDiseaseQuery && !cleanQuery.includes('قرص') && !cleanQuery.includes('شربت') && !cleanQuery.includes('کپسول')) {
     // Generate AI Treatment Protocol
@@ -862,74 +744,74 @@ export const synthesizeAiMedicalData = async (query: string): Promise<{ drug?: D
     return { protocol: aiProtocol };
   } else {
     // Generate AI Drug Monograph
-    const aiDrug: DrugMonograph = {
-      id: `ai-drug-${Date.now()}`,
-      nameFa: cleanQuery,
-      nameEn: cleanQuery,
-      genericNameFa: cleanQuery,
-      genericNameEn: cleanQuery,
-      category: 'داروی تخصصی / درمانی دارویاب (Specialized Therapeutic Agent)',
-      type: cleanQuery.includes('گیاه') || cleanQuery.includes('دمنوش') || cleanQuery.includes('عصاره') ? 'herbal' : 'chemical',
-      indications: {
-        fa: aiRes.text ? `توضیحات و اندیکاسیون بالینی تولید شده توسط هوش مصنوعی (${aiRes.provider}):\n\n${aiRes.text}` : `این دارو برای کنترل، درمان علامتی و مدیریت بالینی مرتبط با «${cleanQuery}» بر اساس پروتکل‌های درمانی استاندارد سازمان غذا و دارو (FDA) و فارماکوپه دارویی ایران تجویز می‌شود. تاثیرگذاری بالایی در کاهش علائم و بهبود کیفیت زندگی بیمار دارد.`,
-        en: aiRes.text ? `Clinical evaluation generated by ${aiRes.provider}:\n${aiRes.text}` : `Indicated for the therapeutic management and symptomatic relief related to "${cleanQuery}" in accordance with FDA clinical practice guidelines and national pharmacopeia standards.`
-      },
-      mechanism: {
-        fa: `با تاثیر بر گیرنده‌های اختصاصی سلولی و تنظیم مسیرهای بیوشیمیایی مرتبط در بافت هدف، موجب تعدیل پاسخ التهابی یا فیزیولوژیک بدن شده و اثر درمانی خود را با کارایی بالا اعمال می‌کند.`,
-        en: `Modulates specific cellular receptors and enzymatic pathways in target tissues, effectively regulating physiological responses with high clinical efficacy.`
-      },
-      dosageAndAdministration: {
-        adults: {
-          fa: `دوز استاندارد بزرگسالان: یک دوز (یک قرص، کپسول یا ۱۰ میلی‌لیتر شربت) ۱ تا ۲ بار در روز بر اساس دستور پزشک معالج، همراه با یک لیوان آب مصرف شود.`,
-          en: `Standard Adult Dose: One unit dose (tablet, capsule, or 10 mL syrup) 1 to 2 times daily as prescribed by physician, taken with a full glass of water.`
-        },
-        pediatrics: {
-          fa: `در کودکان بر اساس وزن و سن: با دوز تنظیم‌شده توسط پزشک معالج و معمولاً نصف دوز بزرگسالان مصرف گردد.`,
-          en: `Pediatrics: Weight and age-dependent titration prescribed by pediatrician (typically half the adult maintenance dose).`
-        },
-        elderly: {
-          fa: `در سالمندان با دوز اولیه کمتر و پایش عملکرد کلیوی و کبدی آغاز شود.`,
-          en: `Initiate at a lower starting dose in elderly patients with monitoring of renal/hepatic function.`
-        }
-      },
-      forms: [
-        `قرص / کپسول روکش‌دار استاندارد ${cleanQuery} (Tablet/Capsule)`,
-        `شربت خوراکی / سوسپانسیون ۱۲۰ میلی‌لیتر (Oral Syrup)`,
-        `فرم موضعی یا قطره استاندارد دارویی (Topical/Drops)`
-      ],
-      sideEffects: {
-        fa: [
+    const aiDrug: DrugMonograph = buildGenericDrug(
+      cleanQuery,
+      `${aiRes.provider}، مراجع Medscape، GuideToPharmacology و کاتالوگ دارویاب`,
+      aiRes.text
+    );
+    return { drug: aiDrug };
+  }
+};
+
+/**
+ * Builds a generic (but clinically-structured) drug monograph.
+ * Used for RxNorm-only results and as the AI fallback when no live source matches.
+ */
+function buildGenericDrug(name: string, source: string, aiText: string = ''): DrugMonograph {
+  return {
+    id: `ai-drug-${Date.now()}`,
+    nameFa: name,
+    nameEn: name,
+    genericNameFa: name,
+    genericNameEn: name,
+    category: 'داروی تخصصی / درمانی دارویاب (Specialized Therapeutic Agent)',
+    type: name.includes('گیاه') || name.includes('دمنوش') || name.includes('عصاره') ? 'herbal' : 'chemical',
+    indications: {
+      fa: aiText ? `توضیحات و اندیکاسیون بالینی تولید شده توسط هوش مصنوعی (${source}):\n\n${aiText}` : `این دارو برای کنترل، درمان علامتی و مدیریت بالینی مرتبط با «${name}» بر اساس پروتکل‌های درمانی استاندارد سازمان غذا و دارو (FDA) و فارماکوپه دارویی ایران تجویز می‌شود. تاثیرگذاری بالایی در کاهش علائم و بهبود کیفیت زندگی بیمار دارد.`,
+      en: aiText ? `Clinical evaluation generated by ${source}:\n${aiText}` : `Indicated for the therapeutic management and symptomatic relief related to "${name}" in accordance with FDA clinical practice guidelines and national pharmacopeia standards.`
+    },
+    mechanism: {
+      fa: `با تاثیر بر گیرنده‌های اختصاصی سلولی و تنظیم مسیرهای بیوشیمیایی مرتبط در بافت هدف، موجب تعدیل پاسخ التهابی یا فیزیولوژیک بدن شده و اثر درمانی خود را با کارایی بالا اعمال می‌کند.`,
+      en: `Modulates specific cellular receptors and enzymatic pathways in target tissues, effectively regulating physiological responses with high clinical efficacy.`
+    },
+    dosageAndAdministration: {
+      adults: { fa: `دوز استاندارد بزرگسالان: یک دوز (یک قرص، کپسول یا ۱۰ میلی‌لیتر شربت) ۱ تا ۲ بار در روز بر اساس دستور پزشک معالج، همراه با یک لیوان آب مصرف شود.`, en: `Standard Adult Dose: One unit dose (tablet, capsule, or 10 mL syrup) 1 to 2 times daily as prescribed by physician, taken with a full glass of water.` },
+      pediatrics: { fa: `در کودکان بر اساس وزن و سن: با دوز تنظیم‌شده توسط پزشک معالج و معمولاً نصف دوز بزرگسالان مصرف گردد.`, en: `Pediatrics: Weight and age-dependent titration prescribed by pediatrician (typically half the adult maintenance dose).` },
+      elderly: { fa: `در سالمندان با دوز اولیه کمتر و پایش عملکرد کلیوی و کبدی آغاز شود.`, en: `Initiate at a lower starting dose in elderly patients with monitoring of renal/hepatic function.` }
+    },
+    forms: [
+      `قرص / کپسول روکش‌دار استاندارد ${name} (Tablet/Capsule)`,
+      `شربت خوراکی / سوسپانسیون ۱۲۰ میلی‌لیتر (Oral Syrup)`,
+      `فرم موضعی یا قطره استاندارد دارویی (Topical/Drops)`
+    ],
+    sideEffects: {
+      fa: [
         'در دوزهای استاندارد معمولاً به خوبی توسط بیماران تحمل می‌شود',
         'احتمال بروز ناراحتی خفیف و موقت گوارشی در برخی افراد حساس',
         'سردرد یا خستگی خفیف گذرا در روزهای اولیه مصرف',
         'در صورت بروز واکنش‌های حساسیتی پوستی، مصرف قطع و به پزشک اطلاع داده شود'
-        ],
-        en: [
+      ],
+      en: [
         'Generally well tolerated at recommended clinical doses',
         'Mild transient gastrointestinal discomfort in sensitive patients',
         'Transient mild headache or fatigue during initial therapy',
         'Discontinue and consult physician if allergic skin rash develops'
-        ]
-      },
-      interactions: {
-        fa: [
+      ]
+    },
+    interactions: {
+      fa: [
         'از مصرف همزمان با الکل یا داروهای تضعیف‌کننده سیستم عصبی خودداری شود',
         'در صورت مصرف داروهای رقیق‌کننده خون (مانند وارفارین یا آسپرین) با پزشک مشورت شود',
         'فاصله زمانی حداقل ۲ ساعت با مکمل‌های آهن، کلسیم و آنتی‌اسیدها رعایت شود'
-        ],
-        en: [
+      ],
+      en: [
         'Avoid concomitant use with alcohol or central nervous system depressants',
         'Consult healthcare provider if taking oral anticoagulants or antiplatelets',
         'Maintain a 2-hour separation interval from antacids, iron, and calcium supplements'
-        ]
-      },
-      precautions: {
-        fa: `دارو را دور از دسترس کودکان، در دمای کمتر از ۳۰ درجه سانتی‌گراد و دور از نور مستقیم خورشید نگهداری کنید. دوره درمان را به طور کامل طی نمایید.`,
-        en: `Keep out of reach of children. Store below 30°C away from direct sunlight and moisture. Complete the prescribed therapeutic regimen.`
-      },
-      pregnancyCategory: 'B / C (در دوران بارداری و شیردهی حتماً با مشورت پزشک متخصص مصرف شود)',
-      source: `${aiRes.provider}، مراجع Medscape، GuideToPharmacology و کاتالوگ دارویاب`
-    };
-    return { drug: aiDrug };
-  }
-};
+      ]
+    },
+    precautions: { fa: `دارو را دور از دسترس کودکان، در دمای کمتر از ۳۰ درجه سانتی‌گراد و دور از نور مستقیم خورشید نگهداری کنید. دوره درمان را به طور کامل طی نمایید.`, en: `Keep out of reach of children. Store below 30°C away from direct sunlight and moisture. Complete the prescribed therapeutic regimen.` },
+    pregnancyCategory: 'B / C (در دوران بارداری و شیردهی حتماً با مشورت پزشک متخصص مصرف شود)',
+    source
+  };
+}

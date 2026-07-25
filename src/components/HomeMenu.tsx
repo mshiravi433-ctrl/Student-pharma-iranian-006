@@ -360,6 +360,37 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ onSelectMenu }) => {
         </div>
       </div>
 
+      {/* ROW 5 / FULL WIDTH: DAILY FEED (videos / tips / ads refreshed every 24h) */}
+      <div
+        onClick={() => handleMenuClick('daily-feed')}
+        className="group relative cursor-pointer overflow-hidden rounded-3xl glass-card p-4 sm:p-5 border border-purple-500/30 hover:border-pink-500/60 shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.99] flex items-center justify-between"
+      >
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-purple-600/30 to-pink-600/30 rounded-full blur-3xl group-hover:scale-125 transition-transform" />
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 via-pink-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/20 group-hover:scale-110 transition-transform flex-shrink-0">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-base font-extrabold text-white group-hover:text-pink-300 transition-colors">
+                فید روزانه: ویدیو، نکات و تبلیغات
+              </h4>
+              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold flex items-center gap-1">
+                <Sparkles className="w-3 h-3 animate-spin" style={{ animationDuration: '4s' }} />
+                هر ۲۴ ساعت
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              ویدیوهای آموزشی، نکات کاربردی دانشجویی و تبلیغات ویژه — به‌روزرسانی روزانه و حذف موارد قدیمی.
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden sm:flex w-10 h-10 rounded-full bg-white/5 group-hover:bg-pink-500/20 text-purple-400 group-hover:text-pink-300 items-center justify-center transition-all">
+          <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+        </div>
+      </div>
+
     </div>
   );
 };
