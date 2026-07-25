@@ -110,73 +110,16 @@ node --env-file=.env.local.keys.txt tests/live.mjs
 جدولی چاپ می‌شود که نشان می‌دهد کدام موتور و کدام منبع دارویی همین الان پاسخ می‌دهد.
 بعد از دیپلوی هم می‌توانید `GET https://<domain>/api/ai` را باز کنید تا همین گزارش را از روی سرور ببینید.
 
-## 🚀 دیپلوی روی Vercel (قدم به قدم)
+## 🚀 دیپلوی روی Vercel
 
-### قدم ۱ — مرج کردن این برنچ
-ابتدا برنچ `arena/019f9aca-student-pharma-iranian-006` را در گیت‌هاب مرج کنید
-(یا در تنظیمات Vercel همین برنچ را به‌عنوان Production Branch انتخاب کنید).
+راهنمای کامل و قدم‌به‌قدم (با ذکر اینکه هر دکمه کجاست) در فایل جداگانه‌ی
+**[DEPLOY.md](./DEPLOY.md)** نوشته شده است.
 
-### قدم ۲ — اتصال پروژه
-در [vercel.com/new](https://vercel.com/new) ریپازیتوری را Import کنید.
-تنظیمات به‌صورت خودکار از `vercel.json` خوانده می‌شود:
+خلاصه‌ی خیلی کوتاه:
+1. Pull Request را در گیت‌هاب مرج کنید.
+2. در [vercel.com/new](https://vercel.com/new) ریپو را Import کنید (تنظیمات خودکار از `vercel.json`).
+3. در بخش Environment Variables کلیدها را وارد کنید (لیست کامل در `DEPLOY.md`).
+4. `Deploy` را بزنید.
+5. آدرس `https://<domain>/api/ai` را باز کنید — اگر `"ok": true` بود، همه چیز کار می‌کند.
 
-| تنظیم | مقدار |
-|-------|-------|
-| Framework Preset | Vite |
-| Build Command | `npm run build` |
-| Output Directory | `dist` |
-| Install Command | `npm install` |
-
-### قدم ۳ — ⚠️ وارد کردن کلیدها (مهم‌ترین قدم)
-در **Settings → Environment Variables** این متغیرها را اضافه کنید و هر سه گزینه
-Production / Preview / Development را تیک بزنید. مقادیر واقعی در فایل محلی
-`.env.local.keys.txt` است:
-
-```
-GEMINI_API_KEY
-MISTRAL_API_KEY
-AIMLAPI_KEY
-BAZAARLINK_API_KEY
-AINATIVE_API_KEY
-CLOUDFLARE_ACCOUNT_ID
-CLOUDFLARE_API_TOKEN
-OLLAMA_LLM_KEY
-APIECO_TOKEN
-OPEN_FDA_API_KEY
-TELEGRAM_BOT_TOKEN
-TELEGRAM_ADMIN_CHAT_ID
-```
-
-اگر متغیری را وارد نکنید، آن موتور به‌سادگی رد می‌شود و نوبت به موتور بعدی می‌رسد
-(برنامه نمی‌شکند). ولی اگر **هیچ‌کدام** وارد نشوند، همه‌ی جستجوها «چیزی پیدا نشد» می‌دهند.
-
-> نکته: بعد از اضافه/تغییر متغیرها حتماً یک بار **Redeploy** بزنید؛ متغیرها فقط در
-> بیلد جدید اعمال می‌شوند.
-
-### قدم ۴ — Deploy و بررسی سلامت
-بعد از اتمام دیپلوی، این آدرس را در مرورگر باز کنید:
-
-```
-https://<your-domain>.vercel.app/api/ai
-```
-
-خروجی JSON دقیقاً می‌گوید کدام موتور فعال است:
-```json
-{ "ok": true, "providers": [ { "provider": "Google Gemini", "ok": true, "ms": 812 }, ... ] }
-```
-- اگر `ok: true` بود ⇒ زنجیره کار می‌کند. ✅
-- اگر موتوری `ok: false` بود ⇒ کلید همان یکی را در Vercel چک کنید (بقیه همچنان کار می‌کنند).
-
-### قدم ۵ — تست جستجو و اتصال تلگرام
-- در مینی‌اپ یک دارو (مثلاً `metformin`) و یک بیماری (مثلاً `دیابت`) را جستجو کنید.
-- سپس `https://<your-domain>.vercel.app/api/telegram-init` را باز کنید تا آیدی عددی
-  تلگرام را بگیرید و در `TELEGRAM_ADMIN_CHAT_ID` قرار دهید.
-- در BotFather آدرس مینی‌اپ را روی دامنه‌ی جدید Vercel ست کنید.
-
-### عیب‌یابی سریع
-| نشانه | علت | راه‌حل |
-|-------|-----|--------|
-| همه‌ی جستجوها «چیزی پیدا نشد» | کلیدها ست نشده‌اند | متغیرها را اضافه و Redeploy کنید |
-| `/api/ai` خطای 404 | خروجی build اشتباه است | `outputDirectory` باید `dist` باشد و rewrite کلی نداشته باشید |
-| `/api/ai` خطای 504 | همه موتورها کند بودند | `maxDuration` برای `api/ai.ts` باید ۳۰ باشد (در `vercel.json` هست) |
-| پیام تلگرام نمی‌رسد | آیدی عددی ست نشده | `TELEGRAM_ADMIN_CHAT_ID` را از `/api/telegram-init` بگیرید |
+⚠️ بعد از هر تغییر در Environment Variables حتماً یک بار **Redeploy** کنید.
