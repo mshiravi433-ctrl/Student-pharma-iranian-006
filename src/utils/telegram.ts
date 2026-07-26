@@ -130,6 +130,22 @@ export const queryFeedApi = async (): Promise<any | null> => {
 };
 
 // -----------------------------------------------------------------------------
+//  Live student jobs pulled from the reference job boards (via /api/jobs).
+// -----------------------------------------------------------------------------
+export const queryJobsApi = async (): Promise<any | null> => {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    const res = await fetch('/api/jobs', { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
+// -----------------------------------------------------------------------------
 //  Telegram delivery: actually sends order / support / service messages to the
 //  owner's Telegram via the server-side /api/notify endpoint. Falls back to
 //  opening a Telegram deep-link if the backend is unavailable.

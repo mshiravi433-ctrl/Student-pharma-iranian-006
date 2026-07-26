@@ -13,6 +13,7 @@ import { JobsView } from './components/views/JobsView';
 import { StudyAbroadView } from './components/views/StudyAbroadView';
 import { ShopView } from './components/views/ShopView';
 import { SupportView } from './components/views/SupportView';
+import { AboutView } from './components/views/AboutView';
 import { DailyFeedView } from './components/views/DailyFeedView';
 import { ArrowRight } from 'lucide-react';
 
@@ -64,6 +65,7 @@ export function App() {
         {currentView === 'study-abroad' && <StudyAbroadView />}
         {currentView === 'shop' && <ShopView />}
         {currentView === 'support' && <SupportView />}
+        {currentView === 'about' && <AboutView />}
         {currentView === 'daily-feed' && <DailyFeedView onNavigate={handleNavigate} />}
       </main>
 

@@ -143,10 +143,10 @@ export const SupportView: React.FC = () => {
           </div>
           <div>
             <h2 className="text-lg sm:text-xl font-black text-white">
-              پشتیبانی آنلاین و مشاور هوشمند دانشجویی
+              پشتیبانی
             </h2>
             <p className="text-xs text-slate-300">
-              ارتباط مستقیم با توسعه‌دهندگان و تهیه کنندگان مینی‌اپ ({PRODUCER_NAME} - @{DEVELOPER_TELEGRAM_ID})
+              ارتباط مستقیم با تیم پشتیبانی مینی اپ همیار دانشجو — @{DEVELOPER_TELEGRAM_ID}
             </p>
           </div>
         </div>
@@ -267,7 +267,7 @@ export const SupportView: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <span className="text-xs font-bold text-slate-400 block">تهیه کنندگان و ایده‌پردازان پروژه:</span>
+              <span className="text-xs font-bold text-slate-400 block">درباره ما — تهیه کننده و ایده پردازان:</span>
               <h3 className="text-lg font-black bg-gradient-to-r from-purple-300 via-pink-300 to-white bg-clip-text text-transparent">
                 {PRODUCER_NAME}
               </h3>
@@ -289,7 +289,7 @@ export const SupportView: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40 transition-all active:scale-95"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>ارتباط مستقیم در تلگرام (@{DEVELOPER_TELEGRAM_ID})</span>
+                <span>پشتیبانی: @{DEVELOPER_TELEGRAM_ID}</span>
               </a>
 
               <a
@@ -299,7 +299,7 @@ export const SupportView: React.FC = () => {
                 onClick={() => triggerHaptic('medium')}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95"
               >
-                <span>با اسم حمایت کنید (حمایت مالی از پروژه) ❤️</span>
+                <span>با حمایت مالی، به تداوم پروژه کمک کنید ❤️</span>
               </a>
             </div>
           </div>

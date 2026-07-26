@@ -129,6 +129,8 @@ async function load(file, n) {
 }
 const aiHandler = await load('api/ai.ts', 'ai');
 const drugHandler = await load('api/drug.ts', 'drug');
+const feedHandler = await load('api/feed.ts', 'feed');
+const jobsHandler = await load('api/jobs.ts', 'jobs');
 
 const distIndex = existsSync('dist/index.html') ? readFileSync('dist/index.html') : null;
 
@@ -137,6 +139,8 @@ const app = http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/ai') return void (await aiHandler(req, res));
     if (url.pathname === '/api/drug') return void (await drugHandler(req, res));
+    if (url.pathname === '/api/feed') return void (await feedHandler(req, res));
+    if (url.pathname === '/api/jobs') return void (await jobsHandler(req, res));
     if (distIndex) { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(distIndex); }
     res.writeHead(404); res.end();
   } catch (e) {
@@ -157,6 +161,20 @@ const call = async (path, body, method = 'POST') => {
   let json = null; try { json = JSON.parse(text); } catch {}
   return { status: r.status, json, text, contentType: r.headers.get('content-type') };
 };
+
+// Serves a single handler on its own real port and performs a real GET.
+async function getViaHandler(handler) {
+  const srv = http.createServer(async (q, s2) => {
+    try { await handler(q, s2); }
+    catch (e) { s2.writeHead(500, { 'Content-Type': 'application/json' }); s2.end(JSON.stringify({ crashed: true, error: String(e) })); }
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const r = await fetch(`http://127.0.0.1:${srv.address().port}/`);
+  const status = r.status;
+  const json = await r.json();
+  srv.close();
+  return { status, json };
+}
 
 console.log(`\n  app      : ${APP}  (real Vercel handlers over real HTTP)`);
 console.log(`  upstream : ${UP}  (real provider stand-in)`);
@@ -326,6 +344,159 @@ await test('everything down online -> found:false (UI shows only "چیزی پی�
 global.fetch = rawFetch;
 
 // =============================================================================
+section('online: /api/feed news + /api/jobs live listings');
+
+await test('/api/feed responds with curated items and a news-source list', async () => {
+  const r = await fetch(APP + '/api/feed');
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.ok(Array.isArray(j.items), 'items missing');
+  assert.ok(j.items.length > 0, 'curated pool should never be empty');
+  assert.ok(Array.isArray(j.newsSources), 'newsSources missing');
+  assert.equal(j.newsSources.length, 5, 'all five news references should be advertised');
+  const names = j.newsSources.map((s) => s.site);
+  for (const must of ['https://seebmagazine.com/', 'https://www.medscape.com/', 'https://www.medicalnewstoday.com/', 'https://www.modernhealthcare.com/', 'https://drmyco.ir/blog/medical-and-health/skin-hair-and-beauty/']) {
+    assert.ok(names.includes(must), `missing news source ${must}`);
+  }
+});
+
+await test('/api/feed survives unreachable news feeds (no crash, curated intact)', async () => {
+  // the sandbox has no outbound internet, so every RSS fetch genuinely fails
+  const r = await fetch(APP + '/api/feed');
+  const j = await r.json();
+  assert.equal(r.status, 200);
+  assert.ok(j.items.every((i) => ['video', 'tip', 'ad', 'news'].includes(i.kind)));
+});
+
+await test('news RSS is really fetched & parsed from a live server (RSS 2.0 + Atom)', async () => {
+  const rss = `<?xml version="1.0"?><rss version="2.0"><channel>
+    <item>
+      <title><![CDATA[کشف داروی جدید برای دیابت نوع ۲]]></title>
+      <link>https://seebmagazine.com/post/123</link>
+      <description><![CDATA[<p>محققان از یک ترکیب جدید <b>رونمایی</b> کردند.</p>]]></description>
+      <pubDate>Sat, 25 Jul 2026 10:00:00 GMT</pubDate>
+      <enclosure url="https://img.example.com/a.jpg" type="image/jpeg"/>
+    </item></channel></rss>`;
+  const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <entry>
+      <title>New Guidance on Statin Therapy</title>
+      <link rel="alternate" href="https://www.medscape.com/view/999"/>
+      <summary>Updated cardiovascular prevention guidance released today.</summary>
+      <published>2026-07-25T08:30:00Z</published>
+    </entry></feed>`;
+
+  const rssSrv = http.createServer((_q, s2) => { s2.writeHead(200, { 'Content-Type': 'application/xml' }); s2.end(rss); });
+  const atomSrv = http.createServer((_q, s2) => { s2.writeHead(200, { 'Content-Type': 'application/xml' }); s2.end(atom); });
+  const deadSrv = http.createServer((_q, s2) => { s2.writeHead(500); s2.end(); });
+  await Promise.all([
+    new Promise((r) => rssSrv.listen(0, '127.0.0.1', r)),
+    new Promise((r) => atomSrv.listen(0, '127.0.0.1', r)),
+    new Promise((r) => deadSrv.listen(0, '127.0.0.1', r)),
+  ]);
+
+  process.env.NEWS_FEEDS_JSON = JSON.stringify([
+    { name: 'سیب مگزین', site: 'https://seebmagazine.com/', feed: `http://127.0.0.1:${rssSrv.address().port}/` },
+    { name: 'Medscape', site: 'https://www.medscape.com/', feed: `http://127.0.0.1:${atomSrv.address().port}/` },
+    { name: 'Broken Source', site: 'https://example.com/', feed: `http://127.0.0.1:${deadSrv.address().port}/` },
+  ]);
+
+  const freshFeed = await load('api/feed.ts', 'feed_rss');
+  const res2 = await getViaHandler(freshFeed);
+  rssSrv.close(); atomSrv.close(); deadSrv.close();
+  delete process.env.NEWS_FEEDS_JSON;
+
+  const news = res2.json.items.filter((i) => i.kind === 'news');
+  assert.ok(news.length >= 2, `expected parsed news, got ${news.length}`);
+
+  const fa = news.find((n) => n.source === 'سیب مگزین');
+  assert.ok(fa, 'Persian RSS item not parsed');
+  assert.equal(fa.title, 'کشف داروی جدید برای دیابت نوع ۲', 'CDATA title not unwrapped');
+  assert.equal(fa.url, 'https://seebmagazine.com/post/123');
+  assert.ok(!/<[a-z]/i.test(fa.text), 'HTML tags leaked into the description');
+  assert.ok(fa.text.includes('رونمایی'), 'description text lost');
+  assert.equal(fa.thumbnail, 'https://img.example.com/a.jpg', 'enclosure image not picked up');
+  assert.equal(fa.publishedAt, Date.parse('Sat, 25 Jul 2026 10:00:00 GMT'), 'pubDate not parsed');
+
+  const en = news.find((n) => n.source === 'Medscape');
+  assert.ok(en, 'Atom entry not parsed');
+  assert.equal(en.title, 'New Guidance on Statin Therapy');
+  assert.equal(en.url, 'https://www.medscape.com/view/999', 'atom href link not resolved');
+
+  assert.ok(!news.some((n) => n.source === 'Broken Source'), 'failing source must be skipped silently');
+});
+
+await test('live jobs are really parsed, filtered for relevance and categorised', async () => {
+  const jobsRss = `<?xml version="1.0"?><rss version="2.0"><channel>
+    <item>
+      <title>دستیار پژوهشی نگارش مقاله ISI پزشکی</title>
+      <link>https://jobinja.ir/jobs/aaa</link>
+      <description>همکاری دورکاری در نگارش مقاله، حقوق 8,000,000 تومان، تهران</description>
+      <pubDate>${new Date(Date.now() - 3600e3).toUTCString()}</pubDate>
+    </item>
+    <item>
+      <title>مترجم متون تخصصی دارویی</title>
+      <link>https://jobinja.ir/jobs/bbb</link>
+      <description>ترجمه مقالات دارویی به صورت پروژه ای</description>
+      <pubDate>${new Date(Date.now() - 7200e3).toUTCString()}</pubDate>
+    </item>
+    <item>
+      <title>راننده پایه یکم کامیون</title>
+      <link>https://jobinja.ir/jobs/ccc</link>
+      <description>حمل بار بین شهری</description>
+      <pubDate>${new Date().toUTCString()}</pubDate>
+    </item></channel></rss>`;
+
+  const srv = http.createServer((_q, s2) => { s2.writeHead(200, { 'Content-Type': 'application/xml' }); s2.end(jobsRss); });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  process.env.JOB_FEEDS_JSON = JSON.stringify([
+    { name: 'جابینجا', site: 'https://jobinja.ir', feed: `http://127.0.0.1:${srv.address().port}/` },
+  ]);
+
+  const freshJobs = await load('api/jobs.ts', 'jobs_rss');
+  const res2 = await getViaHandler(freshJobs);
+  srv.close();
+  delete process.env.JOB_FEEDS_JSON;
+
+  const jobs = res2.json.jobs;
+  assert.equal(jobs.length, 2, `irrelevant posting should be filtered out, got ${jobs.length}`);
+  assert.ok(!jobs.some((j) => j.title.includes('راننده')), 'non-medical job leaked through');
+
+  const research = jobs.find((j) => j.title.includes('مقاله'));
+  assert.equal(research.category, 'research', 'category detection failed');
+  assert.equal(research.type, 'remote', 'remote detection failed');
+  assert.equal(research.location, 'تهران', 'location detection failed');
+  assert.ok(research.salary.includes('تومان'), 'salary detection failed');
+  assert.equal(research.isNew, true, 'recent posting should be flagged new');
+  assert.equal(research.externalUrl, 'https://jobinja.ir/jobs/aaa');
+
+  const translator = jobs.find((j) => j.title.includes('مترجم'));
+  assert.equal(translator.category, 'translation');
+  assert.equal(translator.type, 'project');
+});
+
+await test('/api/jobs returns a valid envelope and advertises the reference boards', async () => {
+  const r = await fetch(APP + '/api/jobs');
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.ok, true);
+  assert.ok(Array.isArray(j.jobs), 'jobs array missing');
+  assert.ok(Array.isArray(j.sources) && j.sources.length >= 3, 'job sources missing');
+  const sites = j.sources.map((s) => s.site);
+  assert.ok(sites.some((u) => u.includes('jobinja.ir')));
+  assert.ok(sites.some((u) => u.includes('iranestekhdam.ir')));
+  assert.ok(sites.some((u) => u.includes('karno.ir')));
+});
+
+await test('/api/jobs degrades gracefully when every board is unreachable', async () => {
+  const r = await fetch(APP + '/api/jobs');
+  const j = await r.json();
+  assert.equal(r.status, 200);
+  assert.equal(j.ok, true);
+  assert.equal(j.jobs.length, 0, 'no live jobs expected without internet');
+  assert.notEqual(j.crashed, true);
+});
+
+// =============================================================================
 section('deployment sanity');
 
 await test('dist/index.html was built and is served by the same origin as /api', async () => {
@@ -341,6 +512,8 @@ await test('vercel.json declares every function with a sufficient maxDuration', 
   assert.equal(v.outputDirectory, 'dist');
   assert.ok(v.functions['api/ai.ts'].maxDuration >= 30, 'ai needs >= 30s for a 7-provider chain');
   assert.ok(v.functions['api/drug.ts'].maxDuration >= 15);
+  assert.ok(v.functions['api/jobs.ts'].maxDuration >= 15, 'jobs endpoint needs time for RSS fetches');
+  assert.ok(v.functions['api/feed.ts'].maxDuration >= 15, 'feed endpoint needs time for RSS fetches');
   assert.ok(!v.rewrites, 'a catch-all rewrite would swallow /api routes');
 });
 

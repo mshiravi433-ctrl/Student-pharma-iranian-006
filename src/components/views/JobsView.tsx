@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { STUDENT_JOBS, JOB_RESOURCES } from '../../data/jobsData';
-import { triggerHaptic } from '../../utils/telegram';
+import { StudentJob } from '../../types';
+import { triggerHaptic, queryJobsApi } from '../../utils/telegram';
 import { 
   Briefcase, 
   MapPin, 
@@ -9,13 +10,34 @@ import {
   Laptop, 
   Building2, 
   ExternalLink,
-  Globe
+  Globe,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 export const JobsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [liveJobs, setLiveJobs] = useState<StudentJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
 
-  const filteredJobs = STUDENT_JOBS.filter(job => {
+  // Pull fresh postings from the reference job boards (جابینجا / کارنو / ایران استخدام).
+  const loadLive = useCallback(async () => {
+    setLoading(true);
+    const data = await queryJobsApi();
+    if (data && Array.isArray(data.jobs)) {
+      setLiveJobs(data.jobs as StudentJob[]);
+      setFetchedAt(data.fetchedAt || Date.now());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadLive(); }, [loadLive]);
+
+  // Live postings first, curated base list after (never leaves the page empty).
+  const allJobs: StudentJob[] = [...liveJobs, ...STUDENT_JOBS];
+
+  const filteredJobs = allJobs.filter(job => {
     if (selectedCategory === 'all') return true;
     return job.category === selectedCategory;
   });
@@ -34,18 +56,32 @@ export const JobsView: React.FC = () => {
               <h2 className="text-lg sm:text-xl font-black text-white">
                 کار دانشجویی، استخدام و پروژه‌ها
               </h2>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                متصل به جاب ویژن
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+                {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                {loading ? 'در حال دریافت آگهی‌های جدید...' : `${liveJobs.length} آگهی جدید از مراجع`}
               </span>
             </div>
             <p className="text-xs text-slate-300">
-              فرصت‌های ویژه دانشجویان پزشکی و دانشگاهی با ساعت کاری منعطف، دورکاری و پاره‌وقت
+              آگهی‌های تازه به‌صورت زنده از جابینجا، کارنو و ایران استخدام دریافت می‌شوند.
+              {fetchedAt && <span className="text-slate-400"> • آخرین دریافت: هم‌اکنون</span>}
             </p>
           </div>
         </div>
 
+        {/* Refresh live listings */}
+        <button
+          onClick={() => { triggerHaptic('medium'); loadLive(); }}
+          disabled={loading}
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50 self-stretch sm:self-auto"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>دریافت آگهی‌های جدید</span>
+        </button>
+      </div>
+
+      <div className="glass-panel p-3 rounded-3xl border border-white/10">
         {/* Category Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar text-xs font-bold self-stretch sm:self-auto">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar text-xs font-bold">
           {[
             { id: 'all', label: 'همه آگهی‌ها' },
             { id: 'research', label: 'دستیار پژوهشی و مقاله' },
@@ -115,7 +151,13 @@ export const JobsView: React.FC = () => {
               className="group rounded-3xl glass-card p-5 border border-white/15 hover:border-emerald-500/60 shadow-xl transition-all flex flex-col justify-between space-y-4"
             >
               <div className="space-y-3">
-                
+                {job.isNew && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold">
+                    <Sparkles className="w-3 h-3" />
+                    <span>آگهی جدید</span>
+                  </span>
+                )}
+
                 {/* Top badges */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="px-2.5 py-1 rounded-xl bg-slate-900/80 border border-white/10 text-xs font-bold text-emerald-400 flex items-center gap-1">

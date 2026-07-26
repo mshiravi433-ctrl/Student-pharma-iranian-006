@@ -8,6 +8,7 @@ export type ActiveView =
   | 'study-abroad'
   | 'shop'
   | 'support'
+  | 'about'
   | 'daily-feed';
 
 export interface TelegramUser {
@@ -93,6 +94,7 @@ export interface StudentJob {
   requirements: string[];
   postedAgo: string;
   category: 'research' | 'tutoring' | 'translation' | 'design' | 'content' | 'data-entry' | 'clinical' | 'medical-part-time';
+  isNew?: boolean;
 }
 
 export interface StudyAbroadForm {
@@ -134,12 +136,13 @@ export interface CustomOrderForm {
 
 export interface FeedItem {
   id: string;
-  kind: 'video' | 'tip' | 'ad';
+  kind: 'video' | 'tip' | 'ad' | 'news';
   title: string;
   text: string;
   url?: string;
   thumbnail?: string;
   actionLabel?: string;
   actionView?: ActiveView;
+  source?: string;
   publishedAt: number;
 }

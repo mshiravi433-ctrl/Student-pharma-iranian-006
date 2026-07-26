@@ -1,7 +1,7 @@
 import React from 'react';
-import { PRODUCER_NAME, DEVELOPER_TELEGRAM_ID, triggerHaptic } from '../utils/telegram';
+import { triggerHaptic } from '../utils/telegram';
 import { ActiveView } from '../types';
-import { Heart, Send, Home, HelpCircle } from 'lucide-react';
+import { Heart, Home, HelpCircle, Users } from 'lucide-react';
 
 interface FooterProps {
   currentView: ActiveView;
@@ -17,6 +17,11 @@ export const Footer: React.FC<FooterProps> = ({ currentView, onNavigate }) => {
   const handleHomeClick = () => {
     triggerHaptic('light');
     onNavigate('home');
+  };
+
+  const handleAboutClick = () => {
+    triggerHaptic('medium');
+    onNavigate('about');
   };
 
   return (
@@ -39,30 +44,30 @@ export const Footer: React.FC<FooterProps> = ({ currentView, onNavigate }) => {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/40 text-xs font-bold transition-all"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>پشتیبانی و ارتباط با توسعه‌دهنده</span>
+            <span>پشتیبانی</span>
+          </button>
+          <button
+            onClick={handleAboutClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/40 text-xs font-bold transition-all"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>درباره ما</span>
           </button>
         </div>
 
-        {/* Producer Banner */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-900/30 via-pink-900/20 to-indigo-900/30 border border-white/15 shadow-lg">
-          <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
-            <span>تهیه کنندگان و ایده‌پردازان:</span>
-            <span className="font-extrabold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-sm">
-              {PRODUCER_NAME}
-            </span>
-          </div>
-          <span className="hidden sm:inline text-slate-600">|</span>
-          <a
-            href={`https://t.me/${DEVELOPER_TELEGRAM_ID}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => triggerHaptic('light')}
-            className="inline-flex items-center gap-1 text-xs font-bold text-indigo-400 hover:text-pink-400 transition-colors"
-          >
-            <Send className="w-3 h-3 -rotate-45" />
-            <span>آی‌دی تلگرام: @{DEVELOPER_TELEGRAM_ID}</span>
-          </a>
-        </div>
+        {/* About Us entry (opens the dedicated page) */}
+        <button
+          onClick={handleAboutClick}
+          className="group flex flex-col sm:flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-900/30 via-pink-900/20 to-indigo-900/30 border border-white/15 hover:border-purple-500/50 shadow-lg transition-all active:scale-95"
+        >
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-300 font-medium">
+            <Users className="w-3.5 h-3.5 text-purple-400" />
+            <span>تیم تهیه‌کننده، ایده‌پردازان و همکاران علمی:</span>
+          </span>
+          <span className="font-extrabold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-sm group-hover:from-pink-400 group-hover:to-purple-400 transition-all">
+            درباره ما
+          </span>
+        </button>
 
         {/* DONATE / SUPPORT BANNER (حمایت مالی و معنوی از پروژه) */}
         <div className="w-full max-w-md mx-auto">
@@ -78,10 +83,10 @@ export const Footer: React.FC<FooterProps> = ({ currentView, onNavigate }) => {
             </div>
             <div className="text-left rtl:text-right">
               <span className="text-xs sm:text-sm font-black text-white group-hover:text-pink-200 transition-colors block">
-                با اسم حمایت کنید (حمایت مالی از پروژه همیار دانشجو) ❤️
+                با حمایت مالی، به تداوم پروژه کمک کنید ❤️
               </span>
               <span className="text-[10px] text-pink-300 font-mono block">
-                reymit.ir/shiravi - Donate & Support Student Community
+                reymit.ir/shiravi - Support the Student Community
               </span>
             </div>
           </a>

@@ -15,7 +15,8 @@ import {
   TrendingDown,
   ChevronLeft,
   Calculator,
-  FileText
+  FileText,
+  Users
 } from 'lucide-react';
 
 interface HomeMenuProps {
@@ -47,7 +48,7 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ onSelectMenu }) => {
           <span>هوش مصنوعی جامع پزشکی و دستیار دانشجویی تلگرام</span>
         </div>
         <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-          به مینی‌اپ <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300 bg-clip-text text-transparent">همیار دانشجو</span> خوش آمدید
+          مینی اپ <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300 bg-clip-text text-transparent">همیار دانشجو</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto">
           مرجع کامل اطلاعات دارویی و درمانی دو زبانه، کتابخانه آموزشی، کاریابی دانشجویی و واردات مستقیم وسایل با ۴۰٪ تا ۷۰٪ تخفیف
@@ -343,14 +344,14 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ onSelectMenu }) => {
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-base font-extrabold text-white group-hover:text-pink-300 transition-colors">
-                پشتیبانی آنلاین و مشاور دانشجویی
+                پشتیبانی
               </h4>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
                 آنلاین ۲۴/۷
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              ارسال مستقیم سوالات، پیشنهادات و پیگیری سفارشات به اکانت تلگرام پشتیبانی: <span className="font-mono text-purple-300 font-bold">@Shiravi4333</span>
+              ارسال مستقیم سوالات، پیشنهادات و پیگیری سفارشات — پشتیبانی: <span className="font-mono text-purple-300 font-bold">@Shiravi4333</span>
             </p>
           </div>
         </div>
@@ -387,6 +388,30 @@ export const HomeMenu: React.FC<HomeMenuProps> = ({ onSelectMenu }) => {
         </div>
 
         <div className="hidden sm:flex w-10 h-10 rounded-full bg-white/5 group-hover:bg-pink-500/20 text-purple-400 group-hover:text-pink-300 items-center justify-center transition-all">
+          <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+        </div>
+      </div>
+
+      {/* ROW 6 / FULL WIDTH: ABOUT US */}
+      <div
+        onClick={() => handleMenuClick('about')}
+        className="group relative cursor-pointer overflow-hidden rounded-3xl glass-card p-4 sm:p-5 border border-white/15 hover:border-indigo-500/50 shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.99] flex items-center justify-between"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-110 transition-transform flex-shrink-0">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-base font-extrabold text-white group-hover:text-indigo-300 transition-colors">
+              درباره ما
+            </h4>
+            <p className="text-xs text-slate-300 mt-0.5">
+              تهیه کننده و ایده پردازان، بخش بین‌الملل و حقوقی، و همکاران علمی بین‌المللی
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden sm:flex w-10 h-10 rounded-full bg-white/5 group-hover:bg-indigo-500/20 text-purple-400 group-hover:text-indigo-300 items-center justify-center transition-all">
           <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
         </div>
       </div>

@@ -3,19 +3,41 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/ai.ts": { "maxDuration": 30 },
-    "api/drug.ts": { "maxDuration": 15 },
-    "api/notify.ts": { "maxDuration": 15 },
-    "api/feed.ts": { "maxDuration": 10 },
-    "api/telegram-init.ts": { "maxDuration": 10 }
+    "api/ai.ts": {
+      "maxDuration": 30
+    },
+    "api/drug.ts": {
+      "maxDuration": 15
+    },
+    "api/notify.ts": {
+      "maxDuration": 15
+    },
+    "api/feed.ts": {
+      "maxDuration": 20
+    },
+    "api/telegram-init.ts": {
+      "maxDuration": 10
+    },
+    "api/jobs.ts": {
+      "maxDuration": 20
+    }
   },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     }
   ]

@@ -10,15 +10,18 @@ import {
   ArrowLeft,
   Clock,
   Sparkles,
-  ShoppingBag
+  ShoppingBag,
+  Newspaper,
+  Globe
 } from 'lucide-react';
 
-type Tab = 'all' | 'video' | 'tip' | 'ad';
+type Tab = 'all' | 'news' | 'video' | 'tip' | 'ad';
 
 const KIND_META: Record<FeedItem['kind'], { label: string; icon: React.ReactNode; color: string; ring: string }> = {
   video: { label: 'ویدیو', icon: <Video className="w-4 h-4" />, color: 'text-indigo-300', ring: 'border-indigo-500/40 bg-indigo-500/10' },
   tip: { label: 'نکته کاری', icon: <Lightbulb className="w-4 h-4" />, color: 'text-amber-300', ring: 'border-amber-500/40 bg-amber-500/10' },
   ad: { label: 'تبلیغات', icon: <Megaphone className="w-4 h-4" />, color: 'text-pink-300', ring: 'border-pink-500/40 bg-pink-500/10' },
+  news: { label: 'خبر پزشکی', icon: <Newspaper className="w-4 h-4" />, color: 'text-emerald-300', ring: 'border-emerald-500/40 bg-emerald-500/10' },
 };
 
 const timeAgo = (ts: number): string => {
@@ -34,6 +37,7 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
   const [tab, setTab] = useState<Tab>('all');
   const [items, setItems] = useState<FeedItem[]>([]);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
+  const [newsSources, setNewsSources] = useState<{ name: string; site: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -42,6 +46,7 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
     const data = await queryFeedApi();
     if (data && Array.isArray(data.items)) {
       setItems(data.items);
+      setNewsSources(Array.isArray(data.newsSources) ? data.newsSources : []);
       setRefreshedAt(data.refreshedAt || Date.now());
       setError(false);
     } else {
@@ -59,6 +64,7 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
 
   const filtered = tab === 'all' ? items : items.filter(i => i.kind === tab);
   const counts = {
+    news: items.filter(i => i.kind === 'news').length,
     video: items.filter(i => i.kind === 'video').length,
     tip: items.filter(i => i.kind === 'tip').length,
     ad: items.filter(i => i.kind === 'ad').length,
@@ -75,9 +81,9 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
             </div>
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-white">فید روزانه ویدیو، نکات و تبلیغات</h2>
+            <h2 className="text-lg sm:text-xl font-black text-white">فید روزانه: اخبار پزشکی، ویدیو، نکات و تبلیغات</h2>
             <p className="text-xs text-slate-300">
-              ویدیوهای آموزشی، نکات کاربردی دانشجویی و تبلیغات ویژه — هر ۲۴ ساعت به‌روزرسانی و قدیمی‌ها حذف می‌شوند.
+              آخرین اخبار پزشکی از مراجع معتبر، ویدیوهای آموزشی و نکات دانشجویی — هر ۲۴ ساعت به‌روزرسانی و قدیمی‌ها حذف می‌شوند.
             </p>
           </div>
         </div>
@@ -104,6 +110,7 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/5 border border-white/10 text-xs font-bold max-w-md mx-auto w-full overflow-x-auto no-scrollbar">
         {([
           { id: 'all', label: 'همه', count: items.length },
+          { id: 'news', label: 'خبر پزشکی', count: counts.news },
           { id: 'video', label: 'ویدیو', count: counts.video },
           { id: 'tip', label: 'نکات', count: counts.tip },
           { id: 'ad', label: 'تبلیغات', count: counts.ad },
@@ -152,6 +159,12 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
                     <Clock className="w-3 h-3" />
                     {timeAgo(item.publishedAt)}
                   </span>
+                  {item.source && (
+                    <span className="text-[10px] text-emerald-300/90 font-bold flex items-center gap-1 truncate">
+                      <Globe className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{item.source}</span>
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-sm sm:text-base font-extrabold text-white leading-snug">{item.title}</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">{item.text}</p>
@@ -180,6 +193,30 @@ export const DailyFeedView: React.FC<{ onNavigate: (view: ActiveView) => void }>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Medical news reference sources */}
+      {newsSources.length > 0 && (tab === 'all' || tab === 'news') && (
+        <div className="glass-panel p-4 rounded-3xl border border-emerald-500/25 space-y-3">
+          <h3 className="text-xs font-extrabold text-emerald-300 flex items-center gap-2">
+            <Newspaper className="w-4 h-4" />
+            <span>مراجع خبری پزشکی این بخش</span>
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {newsSources.map((src, i) => (
+              <a
+                key={i}
+                href={src.site}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-600/15 border border-white/10 hover:border-emerald-500/40 transition-all group"
+              >
+                <span className="text-xs font-bold text-slate-200 group-hover:text-emerald-200 truncate">{src.name}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>
